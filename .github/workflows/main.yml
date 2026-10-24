@@ -1,52 +1,61 @@
-name: Build APK from ZIP
+
+name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Unzip Project Files Automatically
-        run: |
-          for z in *.zip; do
-            if [ -f "$z" ]; then
-              unzip -o "$z"
-            fi
-          done
-
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter SDK
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
 
-      - name: Generate Android Gradle Wrapper
+      - name: Show Flutter and Java Versions
         run: |
-          flutter create --org dz.energetic --project-name energetic_life_manager --platforms=android .
+          flutter --version
+          dart --version
+          java -version
 
-      - name: Install Dependencies & Build APKs
+      - name: Generate Android Platform Files
         run: |
-          flutter pub get
-          flutter build apk --debug
-          flutter build apk --release
+          if [ ! -f android/gradlew ]; then
+            flutter create --platforms=android \
+              --org dz.energetic \
+              --project-name energetic_life_manager .
+          fi
 
-      - name: Upload Ready-to-Install APKs
+      - name: Install Dependencies
+        run: flutter pub get -v
+
+      - name: Build Debug APK
+        run: flutter build apk --debug -v
+
+      - name: Build Release APK
+        run: flutter build apk --release -v
+
+      - name: Upload APK Files
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: energetic-life-manager-apks
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 90
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30

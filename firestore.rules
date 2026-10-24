@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function hasValidSyncFields() {
+      return request.resource.data.keys().hasAll(['id', 'updated_at', 'device_id', 'is_deleted'])
+        && request.resource.data.id is string
+        && request.resource.data.updated_at is int
+        && request.resource.data.device_id is string
+        && request.resource.data.is_deleted is int;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /meta/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /{collectionName}/{itemId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && hasValidSyncFields();
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
